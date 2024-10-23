@@ -15,7 +15,6 @@ const signupValidation = (req, res, next) => {
     return res.status(400).json({ message: 'Bad request', error });
   }
 
-  // Remove `confirmPassword` from the request body before passing to the controller
   const { confirmPassword, ...validatedData } = value;
   req.body = validatedData;
 

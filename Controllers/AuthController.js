@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 
 const signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body; // confirmPassword is already stripped here
+    const { name, email, password } = req.body;
     const user = await UserModel.findOne({ email });
 
     if (user) {
@@ -12,7 +12,7 @@ const signup = async (req, res) => {
     }
 
     const newUser = new UserModel({ name, email, password });
-    newUser.password = await bcrypt.hash(password, 10); // Hash the password
+    newUser.password = await bcrypt.hash(password, 10);
     await newUser.save();
 
     res.status(201).json({ message: "User created successfully", success: true });
@@ -48,7 +48,36 @@ const login = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const { name, email, oldPassword, newPassword } = req.body;
+    const userId = req.user._id;
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false });
+    }
+    if (oldPassword && newPassword) {
+      const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+      if (!isPasswordValid) {
+        return res.status(403).json({ message: "Old password is incorrect", success: false });
+      }
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+    if (name) user.name = name;
+    if (email) user.email = email;
+    await user.save();
+    return res.status(200).json({
+      message: "Password updated successfully.",
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error", success: false });
+  }
+};
+
 module.exports = {
   signup,
-  login
+  login,
+  updateProfile,
 };
