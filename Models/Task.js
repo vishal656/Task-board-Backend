@@ -15,12 +15,10 @@ const taskSchema = new mongoose.Schema(
       required: true
     },
     assignee: {
-      type: String,
-      required: true
+      type: String
     },
     dueDate: {
-      type: Date,
-      required: true
+      type: Date
     },
     checklist: [
       {
