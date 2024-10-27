@@ -8,7 +8,7 @@ exports.createTask = async (req, res) => {
       title,
       status,
       priority,
-      assignee,
+      assignee:assignee ? assignee:null,
       dueDate,
       checklist,
       user: req.user._id
@@ -55,11 +55,14 @@ exports.deleteTask = async (req, res) => {
   }
 };
 
-//get  task
+// get tasks for assigner and assignee
 exports.getTasks = async (req, res) => {
   try {
-    const tasks = await Task.find({ user: req.user._id });
-    return res.status(200).json({ success: true,tasks});
+    const userId = req.user._id;
+    const tasks = await Task.find({
+      $or: [{ user: userId }, { assignee: req.user.email }]
+    });
+    return res.status(200).json({ success: true, tasks });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch tasks' });
   }
@@ -68,7 +71,7 @@ exports.getTasks = async (req, res) => {
 //get user
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}, 'email');
+    const users = await User.find({},'name email');
     res.status(200).json({ success: true,users});
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -90,6 +93,60 @@ exports.updateTaskStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getTaskAnalytics = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Count tasks by status for both creator and assignee
+    const statusCounts = await Task.aggregate([
+      {
+        $match: {
+          $or: [{ user: userId }, { assignee: req.user.email }]
+        }
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Count tasks by priority for both creator and assignee
+    const priorityCounts = await Task.aggregate([
+      {
+        $match: {
+          $or: [{ user: userId }, { assignee: req.user.email }]
+        }
+      },
+      {
+        $group: {
+          _id: "$priority",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Count overdue tasks for both creator and assignee
+    const dueTasks = await Task.countDocuments({
+      $or: [{ user: userId }, { assignee: req.user.email }],
+      dueDate: { $lte: new Date() }
+    });
+
+    res.status(200).json({
+      success: true,
+      statusCounts,
+      priorityCounts,
+      dueTasks
+    });
+  } catch (error) {
+    console.error("Analytics Error:", error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+};
+
+
 
 
 
