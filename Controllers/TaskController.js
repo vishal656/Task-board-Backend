@@ -146,6 +146,33 @@ exports.getTaskAnalytics = async (req, res) => {
   }
 };
 
+exports.assignDashboardTasks = async (req, res) => {
+  try {
+    const { assigneeEmail } = req.body;
+    const assignerId = req.user._id;
+
+    const assignee = await User.findOne({ email: assigneeEmail });
+    if (!assignee) {
+      return res.status(404).json({ message: 'Assignee user not found', success: false });
+    }
+
+    const result = await Task.updateMany(
+      { user: assignerId },
+      { $set: { assignee: assigneeEmail } }
+    );
+
+   // const modifiedCount = result.modifiedCount || result.nModified;
+
+    return res.status(200).json({
+      message: `${assigneeEmail} added to board`,
+      success: true
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: 'Failed to assign tasks', success: false });
+  }
+};
+
 
 
 
