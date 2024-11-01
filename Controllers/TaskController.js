@@ -59,9 +59,15 @@ exports.deleteTask = async (req, res) => {
 exports.getTasks = async (req, res) => {
   try {
     const userId = req.user._id;
+
     const tasks = await Task.find({
-      $or: [{ user: userId }, { assignee: req.user.email }]
+      $or: [
+        { user: userId },
+        { assignee: req.user.email },
+        { sharedWith: userId }
+      ]
     });
+
     return res.status(200).json({ success: true, tasks });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch tasks' });
@@ -156,12 +162,15 @@ exports.assignDashboardTasks = async (req, res) => {
       return res.status(404).json({ message: 'Assignee user not found', success: false });
     }
 
-    const result = await Task.updateMany(
-      { user: assignerId },
-      { $set: { assignee: assigneeEmail } }
+    await Task.updateMany(
+      {
+        $or: [
+          { user: assignerId },
+          { sharedWith: assignerId }
+        ]
+      },
+      { $addToSet: { sharedWith: assignee._id } }
     );
-
-   // const modifiedCount = result.modifiedCount || result.nModified;
 
     return res.status(200).json({
       message: `${assigneeEmail} added to board`,
