@@ -104,13 +104,18 @@ exports.getTaskAnalytics = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Count tasks by status for both creator and assignee
+    // Match tasks where the user is the creator, assignee, or in the sharedWith array
+    const matchCondition = {
+      $or: [
+        { user: userId },
+        { assignee: req.user.email },
+        { sharedWith: userId }
+      ]
+    };
+
+    // Count tasks by status for creator, assignee, or sharedWith
     const statusCounts = await Task.aggregate([
-      {
-        $match: {
-          $or: [{ user: userId }, { assignee: req.user.email }]
-        }
-      },
+      { $match: matchCondition },
       {
         $group: {
           _id: "$status",
@@ -119,13 +124,9 @@ exports.getTaskAnalytics = async (req, res) => {
       }
     ]);
 
-    // Count tasks by priority for both creator and assignee
+    // Count tasks by priority for creator, assignee, or sharedWith
     const priorityCounts = await Task.aggregate([
-      {
-        $match: {
-          $or: [{ user: userId }, { assignee: req.user.email }]
-        }
-      },
+      { $match: matchCondition },
       {
         $group: {
           _id: "$priority",
@@ -134,9 +135,9 @@ exports.getTaskAnalytics = async (req, res) => {
       }
     ]);
 
-    // Count overdue tasks for both creator and assignee
+    // Count overdue tasks for creator, assignee, or sharedWith
     const dueTasks = await Task.countDocuments({
-      $or: [{ user: userId }, { assignee: req.user.email }],
+      ...matchCondition,
       dueDate: { $lte: new Date() }
     });
 
@@ -162,13 +163,18 @@ exports.assignDashboardTasks = async (req, res) => {
       return res.status(404).json({ message: 'Assignee user not found', success: false });
     }
 
+    // Find tasks created by, assigned to, or shared with the assigner
+    const tasksToShare = await Task.find({
+      $or: [
+        { user: assignerId },                 // Tasks created by the assigner
+        { assignee: req.user.email },         // Tasks assigned to the assigner
+        { sharedWith: assignerId }            // Tasks already shared with the assigner
+      ]
+    });
+
+    // Add the new assignee to the sharedWith array of each of these tasks
     await Task.updateMany(
-      {
-        $or: [
-          { user: assignerId },
-          { sharedWith: assignerId }
-        ]
-      },
+      { _id: { $in: tasksToShare.map(task => task._id) } },
       { $addToSet: { sharedWith: assignee._id } }
     );
 
@@ -181,6 +187,7 @@ exports.assignDashboardTasks = async (req, res) => {
     return res.status(500).json({ message: 'Failed to assign tasks', success: false });
   }
 };
+
 
 
 
